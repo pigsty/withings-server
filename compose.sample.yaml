@@ -1,0 +1,37 @@
+networks:
+  macvlan0_0:
+    external: true
+  bridge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+services:
+  withings-server:
+    image: withings-server:latest
+    container_name: withings-server
+    restart: unless-stopped
+    mac_address: "02:42:ac:11:00:01"  # Set a unique MAC; add a DHCP reservation for this on your router
+    networks:
+      macvlan0_0:
+        ipv4_address: 192.168.1.122   # Set to the IP your router will assign via DHCP reservation
+      bridge:
+        ipv4_address: 172.20.0.2
+    volumes:
+      - /mnt/data1/withings/data:/data
+    environment:
+      LOG_LEVEL: info
+      SQLITE_PATH: /data/withings.sqlite
+      WITHINGS_ONCE_TOKEN: "21112cb3-1b433eef"
+  host-bridge:
+    image: alpine/socat
+    container_name: withings-host-proxy
+    restart: unless-stopped
+    networks:
+      - bridge  # This allows it to reach 172.20.0.2
+    ports:
+      - "8085:80"
+    command: tcp-listen:80,fork,reuseaddr tcp-connect:172.20.0.2:80
+    depends_on:
+      - withings-server
