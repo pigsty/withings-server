@@ -292,7 +292,9 @@
             ? measurement.weightKg
             : metric === "fatMass"
               ? measurement.composition?.fatMassKg
-              : measurement.composition?.fatPct;
+              : metric === "fatPct"
+                ? measurement.composition?.fatPct
+                : measurement.batteryLevel;
 
         if (!Number.isFinite(value)) {
           return null;
@@ -303,7 +305,9 @@
           measuredAt: measurement.measuredAt,
           value,
           display:
-            metric === "fatPct"
+            metric === "battery"
+              ? `${value.toFixed(0)}%`
+              : metric === "fatPct"
               ? `${value.toFixed(1)}%`
               : `${value.toFixed(1)} kg`
         };
@@ -724,6 +728,14 @@
         unit="%"
         color="#5b8c5a"
         points={metricSeries("fatPct")}
+        selectedId={selectedMeasurement?.id}
+        on:select={selectMeasurement}
+      />
+      <MetricChart
+        title="Battery"
+        unit="%"
+        color="#6b7280"
+        points={metricSeries("battery")}
         selectedId={selectedMeasurement?.id}
         on:select={selectMeasurement}
       />

@@ -19,7 +19,15 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Run unit tests
+        run: npm run test:unit
 
       - name: Build project
         run: npm run build
@@ -29,5 +37,3 @@ jobs:
 
       - name: Run e2e tests
         run: npm run test:e2e
-        env:
-          NODE_OPTIONS: --test-name-pattern="withings-server e2e"

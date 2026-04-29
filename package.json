@@ -13,7 +13,8 @@
     "build:ui": "vite build --config ui/vite.config.js",
     "build": "npm run build:server && npm run build:ui",
     "start": "node dist/server.js",
-    "test:e2e": "node --test test/e2e.test.mjs"
+    "test:e2e": "node --test test/e2e.test.mjs",
+    "test:unit": "tsx --test test/unit/*.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
