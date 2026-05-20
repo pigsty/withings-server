@@ -2,6 +2,24 @@
   import { onMount } from "svelte";
   import MetricChart from "./lib/MetricChart.svelte";
   import UserAvatar from "./lib/UserAvatar.svelte";
+  import {
+    createUser,
+    fetchUnlinkedMeasurements,
+    fetchUserMeasurements,
+    fetchUsers,
+    unlinkMeasurement,
+    updateUserProfile
+  } from "./lib/api";
+  import {
+    buildMetricSeries,
+    buildProfileUpdatePayload,
+    createDateTimeFormatter,
+    enrichMeasurement,
+    formatNumber,
+    getProfile,
+    getRangeWindow,
+    shiftAnchorDate
+  } from "./lib/dashboardUtils";
   import Unlinked from "./Unlinked.svelte";
 
   const PROFILE_FALLBACKS = {
@@ -46,14 +64,6 @@
   let isUnlinkingMeasurement = false;
   let unlinkError = "";
 
-  function createDateTimeFormatter(primaryOptions, fallbackOptions) {
-    try {
-      return new Intl.DateTimeFormat(undefined, primaryOptions);
-    } catch {
-      return new Intl.DateTimeFormat(undefined, fallbackOptions);
-    }
-  }
-
   const dateFormatter = createDateTimeFormatter(
     {
       month: "short",
@@ -84,14 +94,16 @@
   });
 
   $: activeUser = users.find((user) => user.userId === selectedUserId);
-  $: activeProfile = getProfile(activeUser);
+  $: activeProfile = getProfile(activeUser, PROFILE_FALLBACKS);
   $: hasUsers = users.length > 0;
   $: hasAssignedMeasurements = users.some((user) => user.measurementCount > 0);
   $: showNoUsersOnboarding = !isLoadingUsers && !hasUsers;
   $: showFirstMeasurementOnboarding = !isLoadingUsers && hasUsers && !hasAssignedMeasurements && unlinkedCount === 0;
   $: showFirstAssignmentOnboarding = !isLoadingUsers && hasUsers && !hasAssignedMeasurements && unlinkedCount > 0;
   $: rangeWindow = getRangeWindow(anchorDate, rangeMode);
-  $: chartMeasurements = measurements.map((measurement) => enrichMeasurement(measurement, activeProfile));
+  $: chartMeasurements = measurements.map((measurement) =>
+    enrichMeasurement(measurement, activeProfile, dateFormatter)
+  );
   $: selectedMeasurement =
     chartMeasurements.find((measurement) => measurement.id === selectedMeasurementId) ??
     chartMeasurements[chartMeasurements.length - 1];
@@ -118,12 +130,7 @@
     usersError = "";
 
     try {
-      const response = await fetch("/api/ui/users");
-      if (!response.ok) {
-        throw new Error(`Failed to load users (${response.status})`);
-      }
-
-      const payload = await response.json();
+      const payload = await fetchUsers();
       users = payload.users ?? [];
       if (selectedUserId && !users.some((user) => user.userId === selectedUserId)) {
         selectedUserId = users[0]?.userId;
@@ -141,11 +148,8 @@
 
   async function loadUnlinkedCount() {
     try {
-      const response = await fetch("/api/ui/unlinked");
-      if (response.ok) {
-        const payload = await response.json();
-        unlinkedCount = (payload.measurements ?? []).length;
-      }
+      const payload = await fetchUnlinkedMeasurements();
+      unlinkedCount = (payload.measurements ?? []).length;
     } catch {
       // best-effort, ignore
     }
@@ -159,23 +163,12 @@
 
     try {
       const granularity = rangeMode === "year" ? "weekly" : rangeMode === "quarter" ? "daily" : "raw";
-      const params = new URLSearchParams({
-        start: String(window.startUnix),
-        end: String(window.endUnix),
-        granularity
-      });
-      const response = await fetch(
-        `/api/ui/users/${userId}/measurements?${params.toString()}`,
+      const payload = await fetchUserMeasurements(
+        userId,
+        window,
+        granularity,
         currentMeasurementsAbort?.signal
-          ? { signal: currentMeasurementsAbort.signal }
-          : undefined
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to load measurements (${response.status})`);
-      }
-
-      const payload = await response.json();
       measurements = payload.measurements ?? [];
       selectedMeasurementId = measurements[measurements.length - 1]?.id;
     } catch (error) {
@@ -188,169 +181,16 @@
     }
   }
 
-  function getRangeWindow(date, mode) {
-    const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-
-    if (mode === "month") {
-      const start = new Date(Date.UTC(utc.getUTCFullYear(), utc.getUTCMonth(), 1));
-      const end = new Date(Date.UTC(utc.getUTCFullYear(), utc.getUTCMonth() + 1, 1));
-      return {
-        start,
-        end,
-        startUnix: Math.floor(start.getTime() / 1000),
-        endUnix: Math.floor(end.getTime() / 1000),
-        label: start.toLocaleString(undefined, { month: "long", year: "numeric" })
-      };
-    }
-
-    if (mode === "quarter") {
-      const quarterMonth = Math.floor(utc.getUTCMonth() / 3) * 3;
-      const start = new Date(Date.UTC(utc.getUTCFullYear(), quarterMonth, 1));
-      const end = new Date(Date.UTC(utc.getUTCFullYear(), quarterMonth + 3, 1));
-      const quarter = quarterMonth / 3 + 1;
-      return {
-        start,
-        end,
-        startUnix: Math.floor(start.getTime() / 1000),
-        endUnix: Math.floor(end.getTime() / 1000),
-        label: `Q${quarter} ${start.getUTCFullYear()}`
-      };
-    }
-
-    const start = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-    const end = new Date(Date.UTC(utc.getUTCFullYear() + 1, 0, 1));
-    return {
-      start,
-      end,
-      startUnix: Math.floor(start.getTime() / 1000),
-      endUnix: Math.floor(end.getTime() / 1000),
-      label: String(start.getUTCFullYear())
-    };
-  }
-
   function shiftWindow(step) {
-    const next = new Date(anchorDate);
-    const monthDelta = rangeMode === "month" ? 1 : rangeMode === "quarter" ? 3 : 12;
-    next.setUTCMonth(next.getUTCMonth() + step * monthDelta);
-    anchorDate = next;
-  }
-
-  function getProfile(user) {
-    return {
-      heightM: user?.profileHeightM ?? PROFILE_FALLBACKS.heightM,
-      ageYears: user?.profileAgeYears ?? PROFILE_FALLBACKS.ageYears,
-      sex: user?.profileSex ?? PROFILE_FALLBACKS.sex
-    };
-  }
-
-  function enrichMeasurement(measurement, profile) {
-    const reValue = measurement.values.find((value) => value.type === 16)?.normalizedValue;
-    const composition = calculateBodyComposition(measurement.weightKg, reValue, profile);
-
-    return {
-      ...measurement,
-      reValue,
-      composition,
-      label: dateFormatter.format(new Date(measurement.measuredAt * 1000))
-    };
-  }
-
-  function calculateBodyComposition(weightKg, resistance, profile) {
-    if (!Number.isFinite(weightKg) || !Number.isFinite(resistance) || resistance <= 0) {
-      return null;
-    }
-
-    const heightCm = profile.heightM * 100;
-    const formulaSex = profile.sex === 0 ? 1 : 0;
-    const tbw =
-      0.372 * ((heightCm * heightCm) / resistance) +
-      3.05 * formulaSex +
-      0.142 * weightKg -
-      0.069 * profile.ageYears;
-    const fatFreeMassKg = tbw / 0.73;
-    const rawFatMassKg = weightKg - fatFreeMassKg;
-    const fatMassKg = clamp(rawFatMassKg, 0, weightKg);
-    const fatPct = weightKg > 0 ? clamp((fatMassKg / weightKg) * 100, 0, 100) : 0;
-
-    return {
-      tbw,
-      fatFreeMassKg,
-      fatMassKg,
-      fatPct
-    };
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
+    anchorDate = shiftAnchorDate(anchorDate, rangeMode, step);
   }
 
   function metricSeries(metric) {
-    return chartMeasurements
-      .map((measurement) => {
-        const value =
-          metric === "weight"
-            ? measurement.weightKg
-            : metric === "fatMass"
-              ? measurement.composition?.fatMassKg
-              : metric === "fatPct"
-                ? measurement.composition?.fatPct
-                : measurement.batteryLevel;
-
-        if (!Number.isFinite(value)) {
-          return null;
-        }
-
-        return {
-          id: measurement.id,
-          measuredAt: measurement.measuredAt,
-          value,
-          display:
-            metric === "battery"
-              ? `${value.toFixed(0)}%`
-              : metric === "fatPct"
-              ? `${value.toFixed(1)}%`
-              : `${value.toFixed(1)} kg`
-        };
-      })
-      .filter(Boolean);
+    return buildMetricSeries(chartMeasurements, metric);
   }
 
   function selectMeasurement(event) {
     selectedMeasurementId = event.detail.id;
-  }
-
-  function formatNumber(value, unit = "") {
-    if (!Number.isFinite(value)) {
-      return "--";
-    }
-
-    return `${value.toFixed(1)}${unit}`;
-  }
-
-  function parseNullableNumber(value, fieldName, options = {}) {
-    const raw = String(value ?? "").trim();
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed)) {
-      throw new Error(`${fieldName} must be a number`);
-    }
-
-    if (options.integer && !Number.isInteger(parsed)) {
-      throw new Error(`${fieldName} must be an integer`);
-    }
-
-    if (typeof options.min === "number" && parsed < options.min) {
-      throw new Error(`${fieldName} must be at least ${options.min}`);
-    }
-
-    if (typeof options.max === "number" && parsed > options.max) {
-      throw new Error(`${fieldName} must be at most ${options.max}`);
-    }
-
-    return parsed;
   }
 
   async function saveProfile() {
@@ -371,27 +211,7 @@
 
     let payload;
     try {
-      payload = {
-        screenName: trimmedScreenName,
-        externalUserId: parseNullableNumber(profileDraft.externalUserId, "External User ID", {
-          integer: true,
-          min: 1
-        }),
-        profileWeightKg: parseNullableNumber(profileDraft.profileWeightKg, "Weight", {
-          min: 0.1
-        }),
-        profileHeightM: parseNullableNumber(profileDraft.profileHeightM, "Height", {
-          min: 0.1
-        }),
-        profileAgeYears: parseNullableNumber(profileDraft.profileAgeYears, "Age", {
-          min: 1
-        }),
-        profileSex: parseNullableNumber(profileDraft.profileSex, "Sex", {
-          integer: true,
-          min: 0,
-          max: 1
-        })
-      };
+      payload = buildProfileUpdatePayload(profileDraft, trimmedScreenName);
     } catch (error) {
       profileSaveError = error instanceof Error ? error.message : "Invalid profile values";
       isSavingProfile = false;
@@ -399,15 +219,7 @@
     }
 
     try {
-      const response = await fetch(`/api/ui/users/${activeUser.userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to save profile (${response.status})`);
-      }
+      await updateUserProfile(activeUser.userId, payload);
 
       profileSaveSuccess = "Profile saved";
       await loadUsers();
@@ -429,17 +241,7 @@
 
     isCreatingUserFromDashboard = true;
     try {
-      const response = await fetch("/api/ui/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ screenName })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create user (${response.status})`);
-      }
-
-      const payload = await response.json();
+      const payload = await createUser({ screenName });
       await loadUsers();
       selectedUserId = payload.userId;
     } catch (error) {
@@ -457,13 +259,7 @@
     unlinkError = "";
     isUnlinkingMeasurement = true;
     try {
-      const response = await fetch(`/api/ui/measurements/${selectedMeasurement.id}/unlink`, {
-        method: "POST"
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to unlink measurement (${response.status})`);
-      }
+      await unlinkMeasurement(selectedMeasurement.id);
 
       await loadMeasurements(selectedUserId, rangeWindow);
       await loadUsers();
