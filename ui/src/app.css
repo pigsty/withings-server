@@ -493,9 +493,14 @@ h1 {
   font-size: 1.5rem;
 }
 
-.metric-header span {
+.metric-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 
 svg {

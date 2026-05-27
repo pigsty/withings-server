@@ -68,13 +68,42 @@ export function createScaleRouter(deps: ScaleRouterDeps): express.Router {
       const parsed = newSessionSchema.parse(req.body ?? {});
       const sessionId = generateSessionId();
       const createdAt = nowUnix();
-      const firstUser = dataAccess.getFirstRegisteredUser();
-      const sessionProfile = firstUser
-        ? dataAccess.getScaleProfileByRowId(firstUser.userId)
-        : null;
-      const recentStats = firstUser
-        ? dataAccess.getRecentMeasurementStats(firstUser.userId, 5)
-        : null;
+      const registeredUsers = dataAccess.listUsers();
+      const sessionUsers =
+        registeredUsers.length > 0
+          ? registeredUsers.map((user) => {
+              const profile = dataAccess.getScaleProfileByRowId(user.userId);
+              const recentStats = dataAccess.getRecentMeasurementStats(user.userId, 5);
+
+              return {
+                id: user.externalUserId ?? user.userId,
+                sn: toScaleShortName(profile.screenName),
+                wt: recentStats.avgWeightKg || profile.weightKg || 70,
+                re: recentStats.avgRe ?? 400,
+                ri: recentStats.avgRi ?? 2000,
+                ht: profile.heightM ?? 1.7,
+                agt: profile.ageYears ?? 40,
+                sx: profile.sex ?? 1,
+                fm: 1,
+                cr: createdAt,
+                att: 0
+              };
+            })
+          : [
+              {
+                id: profileDefaults.userId,
+                sn: toScaleShortName(profileDefaults.screenName),
+                wt: 70,
+                re: 400,
+                ri: 2000,
+                ht: 1.7,
+                agt: 40,
+                sx: 1,
+                fm: 1,
+                cr: createdAt,
+                att: 0
+              }
+            ];
 
       sessions.set(sessionId, {
         sessionId,
@@ -99,21 +128,7 @@ export function createScaleRouter(deps: ScaleRouterDeps): express.Router {
         body: {
           sessionid: sessionId,
           sp: {
-            users: [
-              {
-                id: profileDefaults.userId,
-                sn: toScaleShortName(sessionProfile?.screenName ?? profileDefaults.screenName),
-                wt: recentStats?.avgWeightKg ?? sessionProfile?.weightKg ?? 70,
-                re: recentStats?.avgRe ?? 400,
-                ri: recentStats?.avgRi ?? 2000,
-                ht: sessionProfile?.heightM ?? 1.7,
-                agt: sessionProfile?.ageYears ?? 40,
-                sx: sessionProfile?.sex ?? 1,
-                fm: 1,
-                cr: createdAt,
-                att: 0
-              }
-            ]
+            users: sessionUsers
           },
           ind: {
             lg: process.env.WITHINGS_LANG ?? "en_GB",

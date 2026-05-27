@@ -239,12 +239,50 @@ test("withings-server e2e", async (t) => {
     // 6. Create a profile
     // -----------------------------------------------------------------------
     let userId;
+    let secondUserId;
 
     await t.test("can create a user profile", async () => {
       const { status, body } = await apiPost("/api/ui/users", { screenName: "Alice" });
       assert.equal(status, 201);
       assert.ok(body.userId, "should return userId");
       userId = body.userId;
+    });
+
+    await t.test("can create a second user profile", async () => {
+      const { status, body } = await apiPost("/api/ui/users", { screenName: "Bob" });
+      assert.equal(status, 201);
+      assert.ok(body.userId, "should return userId");
+      secondUserId = body.userId;
+    });
+
+    await t.test("scale /session new returns all registered users in sp.users", async () => {
+      const data = await scalePost("session", {
+        action: "new",
+        macaddress: "00:11:22:33:44:55",
+        auth: "00:11:22:33:44:55",
+        mfgid: "0x0476",
+        hash: "abc123",
+        currentfw: "1234",
+        batterylvl: "100",
+        duration: "30",
+        zreboot: "0"
+      });
+
+      assert.equal(data.status, 0, "session status should be 0");
+      assert.ok(data.body.sessionid, "should return a sessionid");
+
+      const users = data.body.sp?.users;
+      assert.ok(Array.isArray(users), "sp.users should be an array");
+      assert.equal(users.length, 2, "sp.users should include all registered users");
+
+      const userIds = new Set(users.map((u) => u.id));
+      assert.ok(userIds.has(userId), "sp.users should include Alice user id");
+      assert.ok(userIds.has(secondUserId), "sp.users should include Bob user id");
+
+      await scalePost("session", {
+        action: "delete",
+        sessionid: data.body.sessionid
+      });
     });
 
     // -----------------------------------------------------------------------
@@ -320,10 +358,10 @@ test("withings-server e2e", async (t) => {
     // -----------------------------------------------------------------------
     // 12. healthz confirms final counts
     // -----------------------------------------------------------------------
-    await t.test("healthz reflects final state: 1 user, 1 measurement, 0 unlinked", async () => {
+    await t.test("healthz reflects final state: 2 users, 1 measurement, 0 unlinked", async () => {
       const health = await apiGet("/healthz");
       assert.equal(health.ok, true);
-      assert.equal(health.users, 1);
+      assert.equal(health.users, 2);
       assert.equal(health.measurements, 1);
       assert.equal(health.unlinkedMeasurements, 0);
     });

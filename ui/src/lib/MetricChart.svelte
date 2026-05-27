@@ -17,7 +17,9 @@
   $: values = points.map((point) => point.value).filter((value) => Number.isFinite(value));
   $: minValue = values.length ? Math.min(...values) : 0;
   $: maxValue = values.length ? Math.max(...values) : 1;
+  $: meanValue = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
   $: spread = Math.max(maxValue - minValue, 0.1);
+  $: selectedPoint = points.find((p) => p.id === selectedId) ?? points[points.length - 1];
 
   function xFor(index) {
     if (points.length <= 1) {
@@ -50,11 +52,15 @@
     <div>
       <p>{title}</p>
       {#if points.length}
-        <strong>{points[points.length - 1].display}</strong>
+        <strong>{selectedPoint?.display ?? points[points.length - 1].display}</strong>
       {/if}
     </div>
     {#if values.length}
-      <span>{minValue.toFixed(1)} to {maxValue.toFixed(1)} {unit}</span>
+      <small class="metric-stats">
+        <span>min {minValue.toFixed(1)}{unit}</span>
+        <span>avg {meanValue.toFixed(1)}{unit}</span>
+        <span>max {maxValue.toFixed(1)}{unit}</span>
+      </small>
     {/if}
   </div>
 
