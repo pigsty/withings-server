@@ -193,6 +193,29 @@
     selectedMeasurementId = event.detail.id;
   }
 
+  function formatSignedDelta(value, unit = "") {
+    if (!Number.isFinite(value)) {
+      return "--";
+    }
+
+    const sign = value > 0 ? "+" : "";
+    return `${sign}${value.toFixed(1)}${unit}`;
+  }
+
+  function calculateQuartileMeanDelta(series) {
+    if (!Array.isArray(series) || series.length < 2) {
+      return null;
+    }
+
+    const windowSize = Math.max(1, Math.floor(series.length * 0.25));
+    const firstWindow = series.slice(0, windowSize);
+    const lastWindow = series.slice(-windowSize);
+    const firstMean = firstWindow.reduce((sum, point) => sum + point.value, 0) / firstWindow.length;
+    const lastMean = lastWindow.reduce((sum, point) => sum + point.value, 0) / lastWindow.length;
+
+    return lastMean - firstMean;
+  }
+
   async function saveProfile() {
     if (!activeUser) {
       return;
@@ -270,6 +293,11 @@
       isUnlinkingMeasurement = false;
     }
   }
+
+  $: weightSeries = buildMetricSeries(chartMeasurements, "weight");
+  $: fatPctSeries = buildMetricSeries(chartMeasurements, "fatPct");
+  $: weightTrendDelta = calculateQuartileMeanDelta(weightSeries);
+  $: fatPctTrendDelta = calculateQuartileMeanDelta(fatPctSeries);
 </script>
 
 <svelte:head>
@@ -442,7 +470,7 @@
   {/if}
 
   {#if activeUser}
-    <section class="summary-grid">
+    <section class="summary-grid summary-grid-single">
       <article class="summary-profile-card">
         <div class="summary-card-top">
           <span>Profile</span>
@@ -460,25 +488,18 @@
         <strong>{activeUser.screenName}</strong>
         <small>{formatNumber(activeProfile.heightM * 100, " cm")} • {activeProfile.sex === 1 ? "Female" : "Male"} • {activeProfile.ageYears} y</small>
       </article>
-      <article class="measurement-card">
-        <div class="measurement-card-header">
-          <span>Latest Measurement</span>
-          <small>{selectedMeasurement ? detailFormatter.format(new Date(selectedMeasurement.measuredAt * 1000)) : "No measurement selected"}</small>
-        </div>
-        <div class="measurement-metrics">
-          <div class="metric-item">
-            <span>Weight</span>
-            <strong>{formatNumber(selectedMeasurement?.weightKg, " kg")}</strong>
-          </div>
-          <div class="metric-item">
-            <span>Fat %</span>
-            <strong>{formatNumber(selectedMeasurement?.composition?.fatPct, "%")}</strong>
-          </div>
-          <div class="metric-item">
-            <span>Battery</span>
-            <strong>{selectedMeasurement?.batteryLevel ?? "--"}%</strong>
-          </div>
-        </div>
+    </section>
+  {/if}
+
+  {#if activeUser}
+    <section class="trend-split-card" aria-label="Trend summary">
+      <article>
+        <span>Weight Trend</span>
+        <strong>{formatSignedDelta(weightTrendDelta, " kg")}</strong>
+      </article>
+      <article>
+        <span>Fat % Trend</span>
+        <strong>{formatSignedDelta(fatPctTrendDelta, "%")}</strong>
       </article>
     </section>
   {/if}

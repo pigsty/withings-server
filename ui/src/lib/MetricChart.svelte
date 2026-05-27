@@ -52,7 +52,9 @@
     <div>
       <p>{title}</p>
       {#if points.length}
-        <strong>{selectedPoint?.display ?? points[points.length - 1].display}</strong>
+        {#key selectedPoint?.id}
+          <strong class="animated-value">{selectedPoint?.display ?? points[points.length - 1].display}</strong>
+        {/key}
       {/if}
     </div>
     {#if values.length}
@@ -84,6 +86,8 @@
           on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectPoint(point)}
         >
           <circle
+            class="chart-point"
+            class:point-selected={point.id === selectedId}
             cx={xFor(index)}
             cy={yFor(point.value)}
             r={point.id === selectedId ? 6 : 4}

@@ -309,6 +309,10 @@ h1 {
   margin-bottom: 16px;
 }
 
+.summary-grid-single {
+  grid-template-columns: 1fr;
+}
+
 .summary-profile-card {
   display: flex;
   flex-direction: column;
@@ -421,55 +425,33 @@ h1 {
   color: var(--muted);
 }
 
-.measurement-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.measurement-card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.measurement-card-header span {
-  margin: 0;
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.measurement-card-header small {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.measurement-metrics {
+.trend-split-card {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 6px 0 14px;
 }
 
-.metric-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.trend-split-card article {
+  padding: 12px 14px;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--surface-shadow);
 }
 
-.metric-item span {
+.trend-split-card span {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.metric-item strong {
+.trend-split-card strong {
   display: block;
-  font-size: 1.1rem;
+  margin-top: 6px;
+  font-size: 1.06rem;
 }
 
 .chart-stack {
@@ -619,6 +601,11 @@ svg {
 }
 
 @media (max-width: 640px) {
+  .trend-split-card {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
   .summary-grid,
   .detail-grid,
   .meta-grid {
