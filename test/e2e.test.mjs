@@ -3,7 +3,8 @@
  *
  * Prerequisites:
  *   - Docker available on PATH
- *   - Image already built: docker build -t withings-server:latest .
+ *   - Image already built (default): docker build -t withings-server:latest .
+ *   - Optional: set WITHINGS_E2E_IMAGE to override image tag/name.
  *
  * Run with:
  *   node --test test/e2e.test.mjs
@@ -17,7 +18,7 @@ import assert from "node:assert/strict";
 // Config
 // ---------------------------------------------------------------------------
 
-const IMAGE = "withings-server:latest";
+const IMAGE = process.env.WITHINGS_E2E_IMAGE || "withings-server:latest";
 const CONTAINER = "withings-e2e";
 const HOST_PORT = 18080;
 const BASE = `http://localhost:${HOST_PORT}`;
