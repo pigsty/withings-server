@@ -1,8 +1,17 @@
-const CACHE_NAME = "withings-trends-v1";
+const CACHE_NAME = "withings-trends-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(APP_SHELL);
+      // Precache the hashed build assets referenced by the app shell so the first offline launch works.
+      const html = await (await cache.match("/"))?.text();
+      const assets = [...(html ?? "").matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((match) => match[1]);
+      await cache.addAll(assets);
+    })()
+  );
   self.skipWaiting();
 });
 
@@ -37,10 +46,15 @@ self.addEventListener("fetch", (event) => {
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request.mode === "navigate" ? "/" : request, copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         }
         return response;
       })
-      .catch(async () => (await caches.match(request.mode === "navigate" ? "/" : request)) ?? Response.error())
+      .catch(
+        async () =>
+          (await caches.match(request)) ??
+          (request.mode === "navigate" ? await caches.match("/") : undefined) ??
+          Response.error()
+      )
   );
 });
