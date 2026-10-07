@@ -104,9 +104,8 @@
   $: chartMeasurements = measurements.map((measurement) =>
     enrichMeasurement(measurement, activeProfile, dateFormatter)
   );
-  $: selectedMeasurement =
-    chartMeasurements.find((measurement) => measurement.id === selectedMeasurementId) ??
-    chartMeasurements[chartMeasurements.length - 1];
+  $: selectedMeasurement = chartMeasurements.find((measurement) => measurement.id === selectedMeasurementId);
+  $: latestMeasurement = chartMeasurements[chartMeasurements.length - 1];
   $: if (activeUser && profileDraftForUserId !== activeUser.userId) {
     profileDraftForUserId = activeUser.userId;
     profileDraft = {
@@ -170,7 +169,9 @@
         currentMeasurementsAbort?.signal
       );
       measurements = payload.measurements ?? [];
-      selectedMeasurementId = measurements[measurements.length - 1]?.id;
+      if (!measurements.some((measurement) => measurement.id === selectedMeasurementId)) {
+        selectedMeasurementId = undefined;
+      }
     } catch (error) {
       if (error?.name === "AbortError") {
         return;
@@ -190,7 +191,7 @@
   }
 
   function selectMeasurement(event) {
-    selectedMeasurementId = event.detail.id;
+    selectedMeasurementId = event.detail?.id;
   }
 
   function formatSignedDelta(value, unit = "") {
@@ -336,8 +337,8 @@
         </article>
         <article>
           <span>Latest Weight</span>
-          <strong>{formatNumber(selectedMeasurement?.weightKg, " kg")}</strong>
-          <small>{selectedMeasurement ? detailFormatter.format(new Date(selectedMeasurement.measuredAt * 1000)) : "No measurement selected"}</small>
+          <strong>{formatNumber(latestMeasurement?.weightKg, " kg")}</strong>
+          <small>{latestMeasurement ? detailFormatter.format(new Date(latestMeasurement.measuredAt * 1000)) : "No measurements in this period"}</small>
         </article>
       </section>
 
@@ -558,74 +559,18 @@
       />
     </section>
 
-    <section class="detail-card">
-      <div class="detail-header">
-        <div>
-          <p>Measurement Detail</p>
-          <h2>
-            {#if selectedMeasurement}
-              {detailFormatter.format(new Date(selectedMeasurement.measuredAt * 1000))}
-            {:else}
-              Select a point
-            {/if}
-          </h2>
-        </div>
+    {#if selectedMeasurement || unlinkError}
+      <section class="selection-actions">
         {#if selectedMeasurement}
           <button class="unlink-btn" disabled={isUnlinkingMeasurement} on:click={unlinkSelectedMeasurement}>
-            {isUnlinkingMeasurement ? "Unlinking..." : "Unlink"}
+            {isUnlinkingMeasurement ? "Unlinking..." : "Unlink selected measurement"}
           </button>
         {/if}
-      </div>
-      {#if unlinkError}
-        <small class="error">{unlinkError}</small>
-      {/if}
-
-      {#if selectedMeasurement}
-        <div class="detail-grid">
-          <article>
-            <span>Weight</span>
-            <strong>{formatNumber(selectedMeasurement.weightKg, " kg")}</strong>
-          </article>
-          <article>
-            <span>Fat Mass</span>
-            <strong>{formatNumber(selectedMeasurement.composition?.fatMassKg, " kg")}</strong>
-          </article>
-          <article>
-            <span>Body Fat</span>
-            <strong>{formatNumber(selectedMeasurement.composition?.fatPct, "%")}</strong>
-          </article>
-          <article>
-            <span>RE</span>
-            <strong>{formatNumber(selectedMeasurement.reValue)}</strong>
-          </article>
-        </div>
-
-        <div class="meta-grid">
-          <div>
-            <span>Total Body Water</span>
-            <strong>{formatNumber(selectedMeasurement.composition?.tbw, " L")}</strong>
-          </div>
-          <div>
-            <span>Battery</span>
-            <strong>{selectedMeasurement.batteryLevel ?? "--"}%</strong>
-          </div>
-        </div>
-
-        <div class="values-block">
-          <p>Measurement values</p>
-          <div class="value-list">
-            {#each selectedMeasurement.values as value}
-              <div>
-                <span>{value.label}</span>
-                <strong>{formatNumber(value.normalizedValue)}</strong>
-              </div>
-            {/each}
-          </div>
-        </div>
-      {:else}
-        <div class="empty-detail">No measurement in this range yet.</div>
-      {/if}
-    </section>
+        {#if unlinkError}
+          <small class="error">{unlinkError}</small>
+        {/if}
+      </section>
+    {/if}
   {/if}
 </main>
 {/if}
