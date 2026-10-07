@@ -19,7 +19,16 @@
   $: maxValue = values.length ? Math.max(...values) : 1;
   $: meanValue = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
   $: spread = Math.max(maxValue - minValue, 0.1);
-  $: selectedPoint = points.find((p) => p.id === selectedId) ?? points[points.length - 1];
+  $: selectedIndex = selectedId == null ? -1 : points.findIndex((p) => p.id === selectedId);
+  $: selectedPoint = selectedIndex >= 0 ? points[selectedIndex] : undefined;
+  $: selectedXPct = selectedPoint ? (xFor(selectedIndex) / width) * 100 : 50;
+  $: selectedAlign = selectedXPct < 18 ? "start" : selectedXPct > 82 ? "end" : "center";
+
+  const stripDateFormatter = new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
 
   function xFor(index) {
     if (points.length <= 1) {
@@ -43,28 +52,39 @@
     : "";
 
   function selectPoint(point) {
-    dispatch("select", point);
+    dispatch("select", point.id === selectedId ? null : point);
   }
 </script>
 
 <section class="metric-card">
   <div class="metric-header">
-    <div>
-      <p>{title}</p>
-      {#if points.length}
-        {#key selectedPoint?.id}
-          <strong class="animated-value">{selectedPoint?.display ?? points[points.length - 1].display}</strong>
-        {/key}
+    <p>{title}</p>
+  </div>
+
+  {#if points.length}
+    <div class="metric-strip" aria-live="polite">
+      {#if selectedPoint}
+        <div
+          class="metric-selection"
+          class:align-start={selectedAlign === "start"}
+          class:align-end={selectedAlign === "end"}
+          style="left: {selectedXPct}%"
+        >
+          {#key selectedPoint.id}
+            <strong class="animated-value">{selectedPoint.display}</strong>
+          {/key}
+          <small>{stripDateFormatter.format(new Date(selectedPoint.measuredAt * 1000))}</small>
+        </div>
+        <span class="metric-guide" style="left: {selectedXPct}%; border-color: {color}"></span>
+      {:else if values.length}
+        <div class="metric-stats">
+          <span>min <strong>{minValue.toFixed(1)}{unit}</strong></span>
+          <span>avg <strong>{meanValue.toFixed(1)}{unit}</strong></span>
+          <span>max <strong>{maxValue.toFixed(1)}{unit}</strong></span>
+        </div>
       {/if}
     </div>
-    {#if values.length}
-      <small class="metric-stats">
-        <span>min {minValue.toFixed(1)}{unit}</span>
-        <span>avg {meanValue.toFixed(1)}{unit}</span>
-        <span>max {maxValue.toFixed(1)}{unit}</span>
-      </small>
-    {/if}
-  </div>
+  {/if}
 
   {#if points.length}
     <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
@@ -76,6 +96,16 @@
       </defs>
       <line class="baseline" x1={padX} y1={height - padBottom} x2={width - padX} y2={height - padBottom}></line>
       <path d={areaPath} fill={`url(#fill-${title})`}></path>
+      {#if selectedPoint}
+        <line
+          class="selection-guide"
+          x1={xFor(selectedIndex)}
+          y1="0"
+          x2={xFor(selectedIndex)}
+          y2={yFor(selectedPoint.value)}
+          stroke={color}
+        ></line>
+      {/if}
       <path d={linePath} stroke={color} stroke-width="3" fill="none" stroke-linecap="round"></path>
       {#each points as point, index}
         <g

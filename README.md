@@ -56,6 +56,10 @@ For a physical scale, resolve `scalews.withings.net` to this server on your LAN 
 
 The sample compose file creates a dual network solution, so that you can set the hostname of the macvlan interface to scalews.withings.net in your router, but still access the web UI on your docker host DNS name as normal (or via Tailscale if you run that on the docker host).
 
+## Install as an app (PWA)
+
+The web UI is a Progressive Web App. On iOS, open it in Safari, tap Share → **Add to Home Screen** to launch it full-screen like a native app. The offline cache (service worker) only works when the UI is served over HTTPS or from `localhost`; adding to the home screen works without it.
+
 ## Environment Variables
 
 (all optional)
