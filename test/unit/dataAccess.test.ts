@@ -138,3 +138,29 @@ test("listMeasurementsForUser: raw and daily aggregation produce expected rows",
   assert.equal(daily.length, 1);
   assert.equal(daily[0].weightKg, 72);
 });
+
+test("listMeasurementsForUser: weekly aggregation selects the reading nearest each week's mean", () => {
+  const da = createDataAccess();
+  const userId = da.createUiUser("Weekly User");
+  const firstWeek = Date.parse("2023-11-26T12:00:00Z") / 1000;
+  const secondWeek = Date.parse("2023-11-27T12:00:00Z") / 1000;
+
+  persistForUser(da, userId, 70, firstWeek);
+  persistForUser(da, userId, 72, firstWeek + 60);
+  persistForUser(da, userId, 75, firstWeek + 120);
+  persistForUser(da, userId, 80, secondWeek);
+  persistForUser(da, userId, 84, secondWeek + 60);
+  persistForUser(da, userId, 90, secondWeek + 120);
+
+  const weekly = da.listMeasurementsForUser(
+    userId,
+    firstWeek,
+    secondWeek + 7 * 24 * 60 * 60,
+    "weekly"
+  );
+
+  assert.deepEqual(
+    weekly.map((measurement) => measurement.weightKg),
+    [72, 84]
+  );
+});
