@@ -62,7 +62,7 @@
   </div>
 
   {#if points.length}
-    <div class="metric-strip" aria-live="polite">
+    <div class="metric-strip">
       {#if selectedPoint}
         <div
           class="metric-selection"
