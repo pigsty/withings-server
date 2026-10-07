@@ -8,7 +8,13 @@ function assetsReferencedBy(html) {
 // Precache the hashed build assets referenced by the shell and drop any that are no longer used.
 async function syncShellAssets(cache, html) {
   const assets = assetsReferencedBy(html);
-  await Promise.allSettled(assets.map((asset) => cache.add(asset)));
+  await Promise.allSettled(
+    assets.map(async (asset) => {
+      if (!(await cache.match(asset))) {
+        await cache.add(asset);
+      }
+    })
+  );
 
   const keep = new Set(assets);
   const keys = await cache.keys();

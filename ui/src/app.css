@@ -503,7 +503,7 @@ h1 {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1.5px dotted var(--muted);
+  border-left: 1.5px dotted;
   opacity: 0.6;
 }
 

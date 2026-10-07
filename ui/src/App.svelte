@@ -559,11 +559,13 @@
       />
     </section>
 
-    {#if selectedMeasurement}
+    {#if selectedMeasurement || unlinkError}
       <section class="selection-actions">
-        <button class="unlink-btn" disabled={isUnlinkingMeasurement} on:click={unlinkSelectedMeasurement}>
-          {isUnlinkingMeasurement ? "Unlinking..." : "Unlink selected measurement"}
-        </button>
+        {#if selectedMeasurement}
+          <button class="unlink-btn" disabled={isUnlinkingMeasurement} on:click={unlinkSelectedMeasurement}>
+            {isUnlinkingMeasurement ? "Unlinking..." : "Unlink selected measurement"}
+          </button>
+        {/if}
         {#if unlinkError}
           <small class="error">{unlinkError}</small>
         {/if}
