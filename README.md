@@ -11,6 +11,14 @@ The server logs all received handshake and measurement payloads at info level.
 
 Measurements are also persisted to SQLite with automatic user assignment based on recent weight averages.
 
+## Dashboard
+
+The screenshots below use representative sample data.
+
+| Desktop | Mobile |
+| --- | --- |
+| <img src="docs/screenshots/dashboard-desktop.png" alt="Withings Trends dashboard on desktop" width="720"> | <img src="docs/screenshots/dashboard-mobile.png" alt="Withings Trends dashboard on mobile" width="320"> |
+
 Inspiration from this page: https://www.prolixium.com/mynews?id=915
 
 ## Compatibility Notes
